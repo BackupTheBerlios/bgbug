@@ -1,0 +1,341 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>PF: Съкращения при създаването на правилата</title>
+<link rev="made" href="mailto:www@openbsd.org">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+<meta name="resource-type" content="document">
+<meta name="description"   content="the OpenBSD FAQ page">
+<meta name="keywords"      content="openbsd,faq,pf">
+<meta name="distribution"  content="global">
+<meta name="copyright"     content="This document copyright 2003 by OpenBSD.">
+</head>
+
+<body bgcolor="#ffffff" text="#000000">
+<!-- Passes validator.w3.org, please keep it this way;
+please, use a max of 72 chars per line -->
+
+<img alt="[OpenBSD]" height=30 width=141 src="../../../images/smalltitle.gif">
+<p>
+[<a href="anchors.html">Преди: "Котви" и именувани набори с правила</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="pools.html">Следва: Множ.адреси и баланс на натоварването</a>]
+
+<p>
+<h1>
+<font color="#e00000">PF: Съкращения при създаването на правилата</font>
+</h1>
+
+<hr>
+
+<h3>Съдържание</h3>
+<ul>
+<li><a href="#intro">Въведение</a>
+<li><a href="#macros">Използване на макроси</a>
+<li><a href="#lists">Използване на списъци</a>
+<li><a href="#grammar">Граматика на PF</a>
+	<ul>
+	<li><a href="#elim">Елиминиране на ключови думи</a>
+	<li><a href="#return">Опростяване на return изразите</a>
+	<li><a href="#order">Подреждане на ключовите думи</a>
+	</ul>
+</ul>
+
+<hr>
+
+<a name="intro"></a>
+<h2>Въведение</h2>
+PF предлага много начини за опростяване на набора с правила. Като добри
+примери могат да се посочат
+<a href="macros.html#macros">макросите</a> и
+<a href="macros.html#lists">списъците</a>.
+В добавка самият език за описание на правилата (граматиката на PF) също
+допуска реализирането на по-опростени набори. Като правило: 
+колкото по-прост е наборът с правила, толкова по-лесно е разбирането и
+поддържането му.
+
+<a name="macros"></a>
+<h2>Използване на макроси</h2>
+Макросите са полезни с това, че предоставят алтернатива на статичното
+задаване на адреси, номера на портове, имена на интерфейси и т.н.
+Адресът на сървъра е променен? Няма проблеми - просто обновете макроса.
+Няма нужда да се "бърника" из всички правила от набора. Запазете времето
+и енергията си за по-добри цели.
+
+<p>
+Почти като правило се е наложила практиката да се дефинира макрос за
+всеки мрежов интерфейс. Ако се наложи мрежовата карта да бъде сменена с
+друга, която изисква различен драйвер (например да се замени 3Com с Intel),
+макросът може да се обнови и правилата за филтриране ще функционират както
+преди. Друго предимство е инсталирането на един и същ набор с правила на
+няколко системи. Различните системи могат да имат разлики в мрежовите карти
+и използването на макроси позволява инсталирането на един и същ набор с
+правила да протече с минимално редактиране. Препоръчва се информацията в
+наборите с правила, която подлежи на промяна (като номера на портове,
+IP адреси, имена на интерфейси), да бъде дефинирана с макроси.
+<blockquote>
+<tt>
+# дефинира макроси за всеки мрежов интерфейс<br>
+IntIF = "dc0"<br>
+ExtIF = "fxp0"<br>
+DmzIF = "fxp1"
+</tt>
+</blockquote>
+
+<p>
+Друга, често използвана практика е използването на макроси за дефинирането
+на IP адреси и блокове от адреси. Това изключително опростява поддръжката
+на набора с правила при промени в IP адресите.
+<blockquote>
+<tt>
+# дефиниране на мрежите ни<br>
+IntNet = "192.168.0.0/24"<br>
+ExtAdd = "24.65.13.4"<br>
+DmzNet = "10.0.0.0/24"
+</tt>
+</blockquote>
+
+<p>
+Ако някога вътрешната мрежа се разрастне или и бъде отделен друг блок с
+IP адреси, макросът може да се обнови:
+<blockquote>
+<tt>
+IntNet = "{ 192.168.0.0/24, 192.168.1.0/24 }"
+</tt>
+</blockquote>
+
+<p>
+Когато наборът с правила се презареди, всичко ще работи както преди 
+промяната.
+
+<a name="lists"></a>
+<h2>Използване на списъци</h2>
+Нека разгледаме един добър пример за набор от правила, който да обработва
+<a href="http://www.geektools.com/rfc/rfc1918.txt">RFC 1918</a> адресите,
+пакети за които не би трябвало да бъдат пропускани от/към Интернет, и които
+ако бъдат пропуснати, обикновено са източници на неприятностти:
+<blockquote>
+<tt>
+block in quick on tl0 inet from 127.0.0.0/8 to any<br>
+block in quick on tl0 inet from 192.168.0.0/16 to any<br>
+block in quick on tl0 inet from 172.16.0.0/12 to any<br>
+block in quick on tl0 inet from 10.0.0.0/8 to any<br>
+block out quick on tl0 inet from any to 127.0.0.0/8<br>
+block out quick on tl0 inet from any to 192.168.0.0/16<br>
+block out quick on tl0 inet from any to 172.16.0.0/12<br>
+block out quick on tl0 inet from any to 10.0.0.0/8
+</tt>
+</blockquote>
+
+<p>
+Нека да разгледаме следното опростяване:
+<blockquote>
+<tt>
+block in quick on tl0 inet from { 127.0.0.0/8, 192.168.0.0/16, \<br>
+&nbsp;&nbsp;&nbsp;172.16.0.0/12, 10.0.0.0/8 } to any<br>
+block out quick on tl0 inet from any to { 127.0.0.0/8, \<br>
+&nbsp;&nbsp;&nbsp;192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8 }
+</tt>
+</blockquote>
+
+<p>
+Набора с прави се редуцира от 8 реда до 2. Нещата могат да се опростят още,
+ако се използват и макроси, в добавка към използването на списъка:
+<blockquote>
+<tt>
+NoRouteIPs = "{ 127.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12, \<br>
+&nbsp;&nbsp;&nbsp;10.0.0.0/8 }"
+<br>
+ExtIF = "tl0"<br>
+block in quick on $ExtIF from $NoRouteIPs to any<br>
+block out quick on $ExtIF from any to $NoRouteIPs
+</tt>
+</blockquote>
+
+<p>
+Забележете, че макросите и списъците опростяват <tt>/etc/pf.conf</tt> файла,
+но всъщост редовете се разлагат от 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>pfctl(8)</a> на множество правила. Така, примера по-горе ще бъде разложен 
+на следните правила:
+<blockquote>
+<tt>
+block in quick on tl0 inet from 10.0.0.0/8 to any<br>
+block in quick on tl0 inet from 172.16.0.0/12 to any<br>
+block in quick on tl0 inet from 192.168.0.0/16 to any<br>
+block in quick on tl0 inet from 127.0.0.0/8 to any<br>
+block out quick on tl0 inet from any to 10.0.0.0/8<br>
+block out quick on tl0 inet from any to 172.16.0.0/12<br>
+block out quick on tl0 inet from any to 192.168.0.0/16<br>
+block out quick on tl0 inet from any to 127.0.0.0/8
+</tt>
+</blockquote>
+
+<p>
+Както се вижда, разлагането на правилата от PF  е по-скоро удобство за 
+автора и поддръжката на <tt>/etc/pf.conf</tt> файла, отколкото истинско
+опростение за набора с правила, обработван от 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pf&amp;sektion=4&amp;manpath=OpenBSD+3.3"
+>pf(4)</a>.
+
+<p>
+За дефиниране на адреси и портове също могат да се използват макроси. Те 
+могат да бъдат навсякъде във файла с PF правила:
+<blockquote>
+<tt>
+pre  = "pass in quick on ep0 inet proto tcp from "<br>
+post = "to any port { 80, 6667 } keep state"<br>
+<br>
+# Класната стая на David<br>
+$pre 21.14.24.80 $post<br>
+<br>
+# Къщата на Nick<br>
+$pre 24.2.74.79 $post<br>
+$pre 24.2.74.178 $post
+</tt>
+</blockquote>
+
+<p>
+Това се разлага на:
+<blockquote>
+<tt>
+pass in quick on ep0 inet proto tcp from 21.14.24.80 to any \<br>
+&nbsp;&nbsp;&nbsp;port = 80 keep state<br>
+pass in quick on ep0 inet proto tcp from 21.14.24.80 to any \<br>
+&nbsp;&nbsp;&nbsp;port = 6667 keep state<br>
+pass in quick on ep0 inet proto tcp from 24.2.74.79 to any \<br>
+&nbsp;&nbsp;&nbsp;port = 80 keep state<br>
+pass in quick on ep0 inet proto tcp from 24.2.74.79 to any \<br>
+&nbsp;&nbsp;&nbsp;port = 6667 keep state<br>
+pass in quick on ep0 inet proto tcp from 24.2.74.178 to any \<br>
+&nbsp;&nbsp;&nbsp;port = 80 keep state<br>
+pass in quick on ep0 inet proto tcp from 24.2.74.178 to any \<br>
+&nbsp;&nbsp;&nbsp;port = 6667 keep state
+</tt>
+</blockquote>
+
+<a name="grammar"></a>
+<h2>Граматика на PF</h2>
+От OpenBSD 3.3 граматиката на PF  е променена, така че да позволява
+по-голяма гъвкавост в наборите с правила. PF вече може да се "досеща"
+за някои ключови думи т.е. не е задължително те да бъдат специално въвеждани.
+Подредбата на ключовите думо също не е толкова стриктна, колкото би
+трябвало да бъде.
+
+<a name="elim"></a>
+<h3>Елиминиране на ключови думи</h3>
+<p>
+За задаване на "блокирай по подразбиране" policy се използват две правила:
+<blockquote>
+<tt>
+block in all<br>
+block out all
+</tt>
+</blockquote>
+
+<p>
+Това може да се опрости до:
+<blockquote>
+<tt>
+block all
+</tt>
+</blockquote>
+
+<p>
+Когато не е зададена посока, PF приема, че правилото се отнася до пакети,
+предвижващи се и в двете посоки.
+
+<p>
+По подобен начин могат да бъдат премахнати "<tt>from any to any</tt>" и 
+"<tt>all</tt>" клаузите. Например правилата:
+<blockquote>
+<tt>
+block in on rl0 all<br>
+pass &nbsp;in quick log on rl0 proto tcp from any to any port 22 keep state
+</tt>
+</blockquote>
+
+<p>
+могат да се опростят до:
+<blockquote>
+<tt>
+block in on rl0<br>
+pass &nbsp;in quick log on rl0 proto tcp to port 22 keep state</tt>
+</blockquote>
+
+<p>
+Първото правило блокира всички входящи пакети отвсякъде за навсякъде на
+rl0 и второто правило пропуска TCP трафика към порт 22 на rl0.
+
+<a name="return"></a>
+<h3>Опростяване на return изразите</h3>
+<p>
+Наборът с правила за блокиране на пакети и връщане на TCP RST или ICMP
+Unreachable отговор би могъл да изглежда така:
+<blockquote>
+<tt>
+block in all<br>
+block return-rst in proto tcp all<br>
+block return-icmp in proto udp all<br>
+block out all<br>
+block return-rst out proto tcp all<br>
+block return-icmp out proto udp all
+</tt>
+</blockquote>
+
+<p>
+Това може да бъде опростено до:
+<blockquote>
+<tt>
+block return
+</tt>
+</blockquote>
+
+<p>
+Когато PF срещне ключова дума <tt>return</tt>, той ще реагира достатъчно
+интелигентно и ще върне подходящия отговор, или няма да върне нищо, в 
+зависимост от протокола на блокираните пакети.
+
+<a name="order"></a>
+<h3>Подреждане на ключовите думи</h3>
+<p>
+Редът в който се задават ключовите думи в повечето случаи може да бъде
+променян. Например правило зададено като:
+<blockquote>
+<tt>
+pass in log quick on rl0 proto tcp to port 22 \<br> 
+&nbsp;&nbsp;&nbsp;flags S/SA keep state queue ssh label ssh
+</tt>
+</blockquote>
+
+<p>
+Може да се зададе и така:
+<blockquote>
+<tt>
+pass in quick log on rl0 proto tcp to port 22 \<br>
+&nbsp;&nbsp;&nbsp;queue ssh keep state label ssh flags S/SA
+</tt>
+</blockquote>
+
+<p>
+И други, подобни вариации също са допустими.
+
+<p>
+[<a href="anchors.html">Преди: "Котви" и именувани набори с правила</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="pools.html">Следва: Множ.адреси и баланс на натоварването</a>]
+
+<p>
+<hr>
+<a href="index.html"><img height="24" width="24" src="../../../images/back.gif" border="0" alt="[back]"></a> 
+<a href="mailto:www@openbsd.org">www@openbsd.org</a>
+<br>
+<small>
+Оригинал: [ OpenBSD: shortcuts.html,v 1.5 2003/06/13 02:54:08 nick Exp ]<br>
+$Id: shortcuts.html,v 1.1 2003/10/28 07:09:15 moo Exp $<br>
+$Translation$<br>
+$OpenBSD$
+</small>
+
+</body>
+</html> 
