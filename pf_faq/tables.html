@@ -1,0 +1,210 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>PF: Таблици</title>
+<link rev="made" href="mailto:www@openbsd.org">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+<meta name="resource-type" content="document">
+<meta name="description"   content="the OpenBSD FAQ page">
+<meta name="keywords"      content="openbsd,faq,pf">
+<meta name="distribution"  content="global">
+<meta name="copyright"     content="This document copyright 2003 by OpenBSD.">
+</head>
+
+<body bgcolor="#ffffff" text="#000000">
+<!-- Passes validator.w3.org, please keep it this way;
+please, use a max of 72 chars per line -->
+
+<img alt="[OpenBSD]" height=30 width=141 src="../../../images/smalltitle.gif">
+<p>
+[<a href="macros.html">Преди: Списъци и Макроси</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="options.html">Следва: Параметри</a>]
+
+<p>
+<h1><font color="#e00000">PF: Таблици</font></h1>
+
+<hr>
+
+<h3>Съдържание</h3>
+<ul>
+<li><a href="#intro">Въведение</a>
+<li><a href="#config">Конфигуриране</a>
+<li><a href="#manip">Работа с <tt>pfctl</tt></a>
+<li><a href="#addr">Указване на адреси</a>
+<li><a href="#match">Намиране на подходящ адрес</a>
+</ul>
+
+<hr>
+
+<a name="intro"></a>
+<h2>Въведение</h2>
+Таблицата се използва за съхранение на група от IPv4 и/или IPv6 адреси.
+Търсенията в таблицата са изключително бързи и изискват по-малко памет
+и процесорно време, отколкото при <a href="macros.html#lists">списъците</a>. 
+По тази причина, таблицата е идеална за запазване на голяма група от адреси. 
+Времето за претърсване в таблица, съдържаща 50 адреса или такава с 50000 
+адреса се различава незначително.
+Таблици могат да се използват например в полетата за начален и краен адрес на
+правилата за <a href="filter.html">филтриране</a>, 
+<a href="scrub.html">пречистване <tt>scrub</tt></a>,
+<a href="nat.html"> адресни преобразувания <tt>nat</tt></a>, 
+and <a href="rdr.html">пренасочване</a>,
+но не могат да бъдат използвани като адрес за пренасочване в <tt>nat</tt>
+правилата или в параметрите за рутиране (<tt>route-to</tt>, <tt>reply-to</tt>,
+<tt>dup-to</tt>) на правилата за филтриране. Таблици се създават или в 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pf.conf&amp;sektion=5&amp;manpath=OpenBSD+3.3"
+><tt>/etc/pf.conf</tt></a> или с използване на 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+><tt>pfctl(8)</tt></a>.
+
+<a name="config"></a>
+<h2>Конфигуритане</h2>
+В <tt>pf.conf</tt>, таблици се създават с използване на директивата 
+<tt>table</tt>. За всяка таблица могат да се укажат следните атрибути:
+
+<ul>
+<li><tt>const</tt> - съдържанието на таблицата не може да се променя, след като
+тя веднъж е създадена. Ако този атрибут не е зададен,
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+><tt>pfctl(8)</tt></a> може да се използва за добавяне и премахване на адреси
+в/от таблицата по всяко време, дори системата да е в
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=securelevel&amp;sektion=7&amp;manpath=OpenBSD+3.3"
+>ниво за сигурност (securelevel(7))</a> две или по-голямо.
+<li><tt>persist</tt> -ядрото пази таблицата в паметта, дори никое правило да
+не сочи към нея. Без този атрибут ако никое правило не сочи към таблицата,
+тя ще бъде премахната.
+</ul>
+
+<p>
+Пример:
+<blockquote>
+<tt>
+table &lt;goodguys&gt; { 192.0.2.0/24 }<br>
+table &lt;rfc1918&gt; const { 192.168.0.0/16, 172.16.0.0/12, \<br>
+&nbsp;&nbsp;&nbsp;10.0.0.0/8 }<br>
+table &lt;spammers&gt; persist<br>
+<br>
+block in on fxp0 from { &lt;rfc1918&gt;, &lt;spammers&gt; } to any<br>
+pass&nbsp; in on fxp0 from &lt;goodguys&gt; to any<br>
+</tt>
+</blockquote>
+
+<p>
+Адресите могат да се указват също с използване на модификатор за отрицание
+(not modifier). Например:
+<blockquote>
+<tt>
+table &lt;goodguys&gt; { 192.0.2.0/24, !192.0.2.5 }
+</tt>
+</blockquote>
+
+<p>
+Таблицата <tt>goodguys</tt> ще се отнася за всички адреси в мрежата
+192.0.2.0/24 , с изключение на 192.0.2.5.
+
+<p>
+Забележете, че имената на таблици са винаги заградени в &lt; &gt;. 
+
+<p>
+Таблиците могат също така да бъдат попълвани от текстови файлове, съдържащи
+списък с адреси или мрежи:
+<blockquote>
+<tt>
+table &lt;spammers&gt; persist file "/etc/spammers"<br>
+<br>
+block in on fxp0 from &lt;spammers&gt; to any<br>
+</tt>
+</blockquote>
+
+<p>
+Файлът <tt>/etc/spammers</tt> съдържа списък от IP адреси, по
+един на ред. Всички редове започващи с <tt>#</tt> се третират като коментари
+и се игнорират.
+
+<a name="manip"></a>
+<h2>Управление с <tt>pfctl</tt></h2>
+Таблиците могат да бъдат управлявани динамично (on the fly) с използване на
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+><tt>pfctl(8)</tt></a>. Например за добавяне на записи в таблицата 
+&lt;spammers&gt; , разгледана по-горе:
+<blockquote>
+<tt># pfctl -t spammers -Tadd 218.70.0.0/16</tt>
+</blockquote>
+
+<p>
+Тази команда освен това ще създаде таблицата &lt;spammers&gt; , ако тя все 
+още не съществува. Списъка на адресите в таблицата може да се види с:
+<blockquote>
+<tt># pfctl -t spammers -Tshow</tt>
+</blockquote>
+Заедно с <tt>-Tshow</tt>, може да се използва и аргумент <tt>-v</tt>,  за да
+се видят и статистическите данни за всеки запис в таблицата. За премахване на
+адреси от таблицата:
+<blockquote>
+<tt>
+# pfctl -t spammers -Tdelete 218.70.0.0/16
+</tt>
+</blockquote>
+
+<p>
+За повече информация отностно управлението на таблици с <tt>pfctl</tt>, моля
+погледнете 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+><tt>pfctl(8)</tt></a>.
+
+<a name="addr"></a>
+<h2>Указване на адреси</h2>
+Освен с IP адрес, системите могат да бъдат указвани и с тяхното име (hostname).
+Когато за дадено име се намери съответния IP адрес, всички необходими IPv4 и
+IPv6 адреси се въвеждат в таблицата. IP адреси могат да бъдат въвеждани също
+така и с указване на валидно име на интерфейс, или с използване на запазената
+дума <tt>self</tt>, в който случай ще бъдат въведени всички адреси, отнасящи
+се към дадения интерфейс.
+
+<a name="match"></a>
+<h2>Намиране на съответстващия адрес</h2>
+Търсенето на съответния адрес в таблицата винаги връща най-точно отговарящата
+стойност. Това позволява създаването на таблици от вида:
+<blockquote>
+<tt>
+table &lt;goodguys&gt; { 172.16.0.0/16, !172.16.1.0/24, 172.16.1.100 }<br>
+<br>
+block in on dc0 all<br>
+pass  in on dc0 from &lt;goodguys&gt; to any<br>
+</tt>
+</blockquote>
+
+<p>
+За пакети, преминаващи през dc0, търсенето на съответствие в таблицата
+<tt>&lt;goodguys&gt;</tt> ще протече така:
+<ul>
+<li>172.16.50.5 - най-близкото съответствие е 172.16.0.0/16; пакетът отговаря
+на дадената таблица и ще бъде пропуснат
+<li>172.16.1.25 - най-близкото съответствие е !172.16.1.0/24; пакетът отговаря
+на запис от тази таблица, но записа е с отрицание (използван е модификатор 
+ "!"); пакетът не се отнася за дадената таблица и ще бъде блокиран
+<li>172.16.1.100 - точно съответства на 172.16.1.100; пакета са отнася за
+дадената таблица и ще бъде пропуснат
+<li>10.1.4.55 - пакетът не се отнася за дадената таблица и ще бъде блокиран
+</ul>
+
+<p>
+[<a href="macros.html">Преди: Списъци и Макроси</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="options.html">Следва: Параметри</a>]
+
+<p>
+<hr>
+<a href="index.html"><img height="24" width="24" src="../../../images/back.gif" border="0" alt="[back]"></a> 
+<a href="mailto:www@openbsd.org">www@openbsd.org</a>
+<br>
+<small>
+Оригинал: [ OpenBSD: tables.html,v 1.4 2003/06/13 02:54:08 nick Exp ]<br>
+$BgOBSD$<br>
+$Translation$<br>
+$OpenBSD$
+</small>
+
+</body>
+</html> 

@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>PF: Пречистване (Scrub)</title>
+<link rev="made" href="mailto:www@openbsd.org">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+<meta name="resource-type" content="document">
+<meta name="description"   content="the OpenBSD FAQ page">
+<meta name="keywords"      content="openbsd,faq,pf">
+<meta name="distribution"  content="global">
+<meta name="copyright"     content="This document copyright 2002-2003 by OpenBSD.">
+</head>
+
+<body bgcolor="#ffffff" text="#000000">
+
+<img alt="[OpenBSD]" height=30 width=141 src="../../../images/smalltitle.gif">
+<p>
+[<a href="options.html">Преди: Параметри</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="queueing.html">Следва: Queueing</a>]
+
+<p>
+<h1><font color="#e00000">PF: Пречистване (Scrub)</font></h1>
+<hr>
+
+<h3>Съдържание</h3>
+<ul>
+<li><a href="#intro">Въведение</a>
+<li><a href="#options">Параметри</a>
+</ul>
+
+<hr>
+
+<a name="intro"></a>
+<h2>Въведение</h2>
+Пречистване (scrubbing) е нормализация на пакетите, за да се избегнат
+неточностти при интерпретирането на крайната им цел. scrub директивата,
+освен това възстановява (reassembly) фрагментираните пакети, защитава
+от някои форми на атака срещу определени операционни системи и отхвърля
+TCP пакети, които имат невалидни <a href="filter.html#tcpflags">комбинации
+от флагове</a>.
+Обикновеният формат на scrub директивата е:
+<blockquote>
+<tt>
+scrub in all
+</tt>
+</blockquote>
+
+<p>
+Това ще нормализира всички входящи пакети на всички интерфейси.
+
+<p>
+Една от причините да не се нормализират пакетите на някой интерфейс е ако
+през него преминава NFS. Някои non-OpenBSD платформи изпращат (и очакват в
+отговор) особени пакети (например фрагментирани пакети с установен "do not
+fragment" бит), които (вероятно) ще бъдат отхвърлени от <tt>scrub</tt>.
+Това може да се предотврати с използване на <tt>no-df</tt> параметър.
+Друга причина може да бъдат някои multi-player игри, които имат проблеми 
+с връзката, когато тя преминава през PF с разрешен <tt>scrub</tt>.
+С изключение на гореописаните ситуации, пречистването на всички пакети е
+<i>изключително препоръчителна</i> практика.
+
+<p>
+Синтаксиса на <tt>scrub</tt> директивата е подобен на синтаксиса на
+<a href="filter.html">правилата за филтриране</a>, което я прави изключително
+удобна за селективно пречистване на точно определени пакети.
+
+<p>
+Повече за идеите и принципите на пречистването има на адрес:
+<a href="http://www.icir.org/vern/papers/norm-usenix-sec-01-html/index.html"
+>http://www.icir.org/vern/papers/norm-usenix-sec-01-html/index.html</a>
+
+<a name="options"></a>
+<h2>Параметри</h2>
+<tt>scrub</tt> има следните параметри:
+<dl>
+<dt><tt>no-df</tt> 
+<dd>Изчиства <i>don't fragment</i> бита от заглавната част (header) на IP
+пакетите. Извесно е, че някои операционни системи генерират фрагментирани
+пакети с установен <i>don't fragment</i> бит. В частност, това се отнася
+за NFS. <tt>Scrub</tt> ще отхвърли такива пакети, освен ако не е зададен
+<tt>no-df</tt> параметър. Поради това, че някои операционни системи генерират
+<i>don't fragment</i> пакети с нулирано поле за IP идентификация в заглавната
+част (zero IP identification header field), препоръчително е използването на
+<tt>no-df</tt> заедно с <tt>random-id</tt>
+
+<dt><tt>random-id</tt> 
+<dd>Заменя полето за IP идентификация на изходящите пакети със случайно
+генерирани стойности, за да компенсира грешките на операционни системи,
+които генерират предсказуеми стойностти. Този параметър се отнася само за
+изходящи пакети, които не са фрагментирани след възможното им възстановяване
+(reassembly).
+
+<dt><tt>min-ttl <i>num</i></tt> 
+<dd>Задава стриктно минималното време за живот (Time To Live - TTL)
+в заглавната част на IP пакетите
+
+<dt><tt>max-mss <i>num</i></tt> 
+<dd>Задава стриктно максималния размер на сегмент (Maximum Segment Size -
+MSS) в заглавната част на TCP пакетите.
+
+<dt><tt>fragment reassemble</tt> 
+<dd>Натрупва фрагментите от изходящи пакети и ги сглобява отново в завършен
+пакет, преди да ги предаде на системата за филтриране. Предимството е,
+че правилата за филтриране се налага да работят само със завършени пакети и
+могат да игнорират фрагметите. Недостатък е необходимостта от повече памет
+за натрупване на фрагментите от пакети. Това е действието по подразбиране,
+ако не е указан никакъв параметър за фрагментиране. Това е и единственият
+параметър за фрагментиране, който работи с NAT.
+
+<dt><tt>fragment crop</tt> 
+<dd>Причинява отхвърляне на всички дублирани фрагменти и отрязване на
+всички препокриващи се. За разлика от <tt>fragment reassemble</tt>,
+фрагментите не се натрупват, а се предават веднага след пристигането им.
+
+<dt><tt>fragment drop-ovl</tt> 
+<dd>Действа подобно на <tt>fragment crop</tt>, с изключение на това, че
+освен дублираните и препокрити фрагменти, ще бъдат отхвърлени и всички
+фрагменти, свързани с тях, постъпили след това.
+</dl>
+
+<p>
+Пример:
+<blockquote>
+<tt>
+scrub in on fxp0 all fragment reassemble min-ttl 15 max-mss 1400
+</tt>
+</blockquote>
+
+<p>
+[<a href="options.html">Преди: Параметри</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="queueing.html">Следва: Queueing</a>]
+
+<p>
+<hr>
+<a href="index.html"><img height="24" width="24" src="../../../images/back.gif" border="0" alt="[back]"></a> 
+<a href="mailto:www@openbsd.org">www@openbsd.org</a>
+<br>
+<small>
+Оригинал: [ OpenBSD: scrub.html,v 1.4 2003/06/15 16:40:06 nick Exp ]<br>
+$BgOBSD$<br>
+$Translation$<br>
+$OpenBSD$
+</small>
+
+</body>
+</html> 

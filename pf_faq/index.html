@@ -1,0 +1,103 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>PF: The OpenBSD Packet Filter</title>
+<link rev="made" href="mailto:www@openbsd.org">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+<meta name="resource-type" content="document">
+<meta name="description"   content="the OpenBSD FAQ page">
+<meta name="keywords"      content="openbsd,faq,pf">
+<meta name="distribution"  content="global">
+<meta name="copyright"     content="This document copyright 2002-2003 by OpenBSD.">
+</head>
+
+<body bgcolor="#ffffff" text="#000000">
+<!-- Passes validator.w3.org, please keep it this way;
+please, use a max of 72 chars per line -->
+
+<img alt="[OpenBSD]" height=30 width=141 src="../../../images/smalltitle.gif">
+<p>
+<b>Languages:</b> [bg] 
+  &nbsp;<a href="../index.html">[en]</a>
+  &nbsp;<a href="../es/index.html">[es]</a>
+  &nbsp;<a href="../id/index.html">[id]</a>
+  &nbsp;<a href="../ja/index.html">[ja]</a>
+  &nbsp;<a href="../pl/index.html">[pl]</a>
+<p>
+<a href="../index.html">[нагоре към FAQ]</a>
+<a href="config.html">[следва: Конфигуриране]</a>
+<h1><font color="#e00000">PF: OpenBSD филтър за пакети</font></h1>
+<hr>
+
+<p>
+<h3>Съдържание</h3>
+<ul>
+<li><a href="config.html">Конфигуриране</a>
+	<ul>
+	<li><a href="macros.html">Списъци и макроси</a>
+	<li><a href="tables.html">Таблици</a>
+	<li><a href="options.html">Параметри</a>
+	<li><a href="scrub.html">Пречистване (Scrub)</a>
+	<li><a href="queueing.html">Queueing</a>
+	<li><a href="nat.html">Трансформиране на мрежовия адрес</a>
+	<li><a href="rdr.html">Пренасочване на трафик</a>
+	<li><a href="filter.html">Филтриране на пакети</a>
+	</ul>
+<li><a href="logging.html">Записване на данните (Logging)</a>
+<li><a href="anchors.html">"Котви" и именувани (Sub) Rulesets</a>
+<li><a href="shortcuts.html">Съкращения при създаването на Rulesets</a>
+<li><a href="pools.html">Множество адреси и балансиране на натоварването</a>
+<li><a href="perf.html">Производителност</a>
+<li><a href="ftp.html">Проблеми с FTP</a>
+<li><a href="authpf.html">Authpf: потребителски shell за аутентикиращи gateways</a>
+<li><a href="example1.html">Пример #1: Firewall за вкъщи или за малък офис</a>
+</ul>
+
+<hr>
+
+<p>
+Packet Filter (оттук нататък ще бъде споменаван и като PF) е система в OpenBSD
+за филтриране на TCP/IP трафик и извършване трансформации на мрежовия 
+адрес (Network Address Translation - (NAT).
+PF има възможност също за нормализация и условно разпределяне на TCP/IP трафика,
+както и bandwidth контрол и изменение приорита на пакетите.
+От OpenBSD 3.0, PF е част от GENERIC ядрото. Предишните версии на OpenBSD
+използваха различен пакет за firewall/NAT, който вече не се поддържа.
+
+<p>
+PF е оригинална идея на Даниел Хартмайер и в момента се поддържа от
+него и останалите OpenBSD разработчици.
+
+<p>
+Настоящите документи са предназначени за общ увод в работата на PF под
+OpenBSD. Те са предназначени за използване като допълнение към
+<a href="http://www.openbsd.org/cgi-bin/man.cgi">man страниците</a>,
+а не като тяхна замяна. Този документ няма да разглежда всички
+въможностти на PF и е възможно да не е толкова актуален, колкото са man
+страниците.
+
+<p>
+Както и останалата част от FAQ, този документ е ориентиран главно към
+потребители на <a href="../../../33.html">OpenBSD 3.3</a>.
+Поради това, че PF постоянно нараства и се обновява, има разлики между
+версията му в 3.3-release и тази в OpenBSD-current. На читателя се
+препоръчва за направи справка с man страниците от версията на OpenBSD,
+с която работи в момента.
+
+<p>
+<a href="../index.html">[нагоре към FAQ]</a>
+<a href="config.html">[следва: Конфигуриране]</a>
+
+<hr>
+<a href="../index.html"><img height="24" width="24" src="../../../images/back.gif" border="0" alt="[back]"></a> 
+<a href="mailto:www@openbsd.org">www@openbsd.org</a>
+<br>
+<small>
+Оригинал: [ OpenBSD: index.html,v 1.8 2003/09/07 15:55:23 nick Exp ]<br>
+$BgOBSD$<br>
+$Translation$<br>
+$OpenBSD$
+</small>
+
+</body>
+</html> 
