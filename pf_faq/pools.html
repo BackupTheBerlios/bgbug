@@ -1,0 +1,290 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>PF: Множество адреси и балансиране на натоварването</title>
+<link rev="made" href="mailto:www@openbsd.org">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+<meta name="resource-type" content="document">
+<meta name="description"   content="the OpenBSD FAQ page">
+<meta name="keywords"      content="openbsd,faq,pf">
+<meta name="distribution"  content="global">
+<meta name="copyright"     content="This document copyright 2003 by OpenBSD.">
+</head>
+
+<body bgcolor="#ffffff" text="#000000">
+<!-- Passes validator.w3.org, please keep it this way;
+please, use a max of 72 chars per line -->
+
+<img alt="[OpenBSD]" height=30 width=141 src="../../../images/smalltitle.gif">
+<p>
+[<a href="shortcuts.html">Преди: Съкращения при създаването на Rulesets</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="perf.html">Следва: Производителност</a>]
+
+<p>
+<h1>
+<font color="#e00000">PF: Множество адреси и балансиране на натоварването</font>
+</h1>
+
+<hr>
+
+<h3>Съдържание</h3>
+<ul>
+<li><a href="#intro">Въведение</a>
+<li><a href="#nat">Множество от NAT адреси</a>
+<li><a href="#incoming">Баланс на натоварването на входящите връзки</a>
+<li><a href="#outgoing">Баланс на натоварването на изходящия трафик</a>
+	<ul>
+	<li><a href="#outexample">Примерен Ruleset</a>
+	</ul>
+</ul>
+
+<hr>
+
+<a name="intro"></a>
+<h2>Въведение</h2>
+Множество от адреси (address pool) са два или повече адреса, споделяни 
+от група потребители. Множеството от адреси може да се указва като адрес
+за пренасочване (redirection) в <a href="rdr.html"><tt>rdr</tt></a> правилата,
+адрес за преобразуване (translation) в <a href="nat.html"><tt>nat</tt></a> 
+правилата, като краен адрес в <tt>route-to</tt>, <tt>reply-to</tt> и
+<tt>dup-to</tt> параметри за <a href="filter.html">филтриране</a>.
+
+<p>
+Има четири метода за използване на множество от адреси (address pool):
+<ul>
+<li><tt>bitmask</tt> - наслагва мрежовата част на множеството от адреси върху
+адреса за преобразуване (началния адрес в <tt>nat</tt> правилата, 
+крайния адрес в <tt>rdr</tt> правилата). Например:
+ако множеството от адреси е 192.0.2.1/24 и адресът за промяна е 10.0.0.50,
+то резултата ще е 192.0.2.50. Ако множеството от адреси е 192.0.2.1/25 и
+адреса за промяна е 10.0.0.130, резултата че е 192.0.2.2.
+<li><tt>random</tt> - избира случаен адрес от множеството.
+<li><tt>source-hash</tt> - използва хеш, базиран на началния (source) адрес,
+за да определи кой адрес от множеството ще бъде използван. Този метод
+гарантира, че на зададен начален адрес винаги ще съответства точно определен
+адрес от множеството. Незадължително, ключът, който се използва в алгоритъма 
+за хеширане, може да се зададе в шестнадесетичен формат или като стринг след
+ключовата дума <tt>source-hash</tt>. По подразбиране 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>pfctl(8)</a> ще генерира случаен ключ всеки път, когато набора от правила
+се зарежда.
+<li><tt>round-robin</tt> - обхожда по ред множеството от адреси. Това е метода
+по подразбиране.
+</ul>
+
+<p>
+С изключение на <tt>round-robin</tt> метода, множеството от адреси може да
+бъде представено като 
+<a href="http://public.pacbell.net/dedicated/cidr.html">CIDR</a>
+(Classless Inter-Domain Routing - безкласово рутиране между домейни) мрежов
+блок. <tt>round-robin</tt> метода приема множество индивидуални адреси,
+зададени във <a href="macros.html#lists">вид на списък</a>.
+
+<p>
+В добавка, ключовата дума <tt>static-port</tt> може да се укаже след някои
+от посочените по-горе методи, за да предотврати промяната в <tt>nat</tt>
+правилата  на началния (source) порт на TCP и UDP пакетите.  
+
+
+<a name="nat"></a>
+<h2>Множество от NAT адреси</h2>
+Множество от адреси може да се използва като адрес за преобразуване 
+(translation) в <a href="nat.html"><tt>nat</tt></a> правилата. Връзките ще
+имат начален адрес, преобразуван в адрес от множеството, според избрания метод.
+Това може да е полезно в ситуации, където PF се използва за NAT на изкючително
+големи мрежи. Поради това, че броя на връзките, с приложен NAT, за всеки 
+преобразуван адрес е ограничен, добавянето на допълнителни адреси за 
+преобразуване ще позволи NAT gateway да обслужда по-голям брой потребители.
+
+<p>
+В примера по-долу множество от два адреса се използва за преобразуване на
+изходящите пакети. За всяка изходяща връзка PF ще обхожда адресите с 
+round-robin.
+<blockquote>
+<tt>
+nat on $ext_if inet from any to any -&gt; { 192.0.2.5, 192.0.2.10 }
+</tt>
+</blockquote>
+
+<p>
+Недостатък на този метод е, че успешните връзки от един и същ вътрешен адрес
+не винаги ще бъдат преобразувани в един и същи изходящ адрес. Това поражда
+проблеми, например при преглеждане на websites, който водят отчет за 
+потребителите на базата на IP адреса им. Като алтернатива може да се използва
+<tt>source-hash</tt> метод, така че определен вътрешен адрес винаги ще бъде
+преобразуван винаги към един и същ изходящ адрес. За целта, множеството от
+адреси трябва да е мрежов блок от вида 
+<a href="http://public.pacbell.net/dedicated/cidr.html">CIDR</a>
+<blockquote>
+<tt>
+nat on $ext_if inet from any to any -&gt; 192.0.2.4/31 source-hash
+</tt>
+</blockquote>
+
+<p>
+<tt>nat</tt> правилото използва множество от адреси 192.0.2.4/31 (192.0.2.4 -
+192.0.2.5) като адрес за преобразуване на изходящите пакети. Всеки вътрешен
+адрес ще бъде преобразуван винаги към идни и същ изходящ адрес поради 
+използването на ключовата дума <tt>source-hash</tt>.
+
+<a name="incoming"></a>
+<h2>Баланс на натоварването на входящите връзки</h2>
+Множество от адреси може да бъде използвано също и за баланс на натоварването 
+на входящите връзки. Например входящите връзки към web сървър, могат да бъдат
+разпределени между множество подобни сървъри (web server farm):
+<blockquote>
+<tt>
+web_servers = "{ 10.0.0.10, 10.0.0.11, 10.0.0.13 }"<br>
+<br>
+rdr on $ext_if proto tcp from any to any port 80 -&gt; $web_servers
+</tt>
+</blockquote>
+
+<p>
+Успешните връзки ще бъдат пренасочени към web сървърите, като се използва
+round-robin обхождане.
+
+<p>
+Както и в примера за NAT, ако web сървърите се описват с CIDR мрежов блок,
+може да се използва ключовата дума <tt>source-hash</tt>, така че връзките
+към даден IP адрес винаги да се пренасочват към един и същи web сървър.
+Това, както беше споменато вече, е необходимо за да се поддържа информация
+за сесиите (session) при достъпа до website.
+
+<a name="outgoing"></a>
+<h2>Баланс на натоварването на изходящия трафик</h2>
+Множество от адреси, в комбинация с параметър за филтриране <tt>route-to</tt>,
+може да се използва за балансиране на натоварването на две или повече връзки,
+когато използването на подходящ multi-path протокол за рутиране (като например
+<a href="http://www.rfc-editor.org/rfc/rfc1771.txt">BGP4</a>) е невъзможно.
+С използването на <tt>route-to</tt> в <tt>round-robin</tt> множество от
+адреси, изходящите връзки могат евентуално да се разпределят между множество
+назначения.
+
+<p>
+Като допълнителна информация, за да се осъществи това, е необходимо да се
+зададе IP адреса на непосредствено следващия за всяка Интернет връзка рутър.
+Това се добавя към параметъра <tt>route-to</tt> за да се контролира откъде
+ще преминат изходящите пакети.
+
+<p>
+Примерът, който следва е за балансиране на натоварването на изходящия трафик
+на две Интернет връзки:
+<blockquote>
+<tt>
+lan_net = "192.168.0.0/24"<br>
+int_if &nbsp;= "dc0"<br>
+ext_if1 = "fxp0"<br>
+ext_if2 = "fxp1"<br>
+ext_gw1 = "68.146.224.1"<br>
+ext_gw2 = "142.59.76.1"<br>
+<br>
+pass in on $int_if route-to \<br>
+&nbsp;&nbsp;&nbsp;{ ($ext_if1 $ext_gw1), ($ext_if2 $ext_gw2) } round-robin \<br>
+&nbsp;&nbsp;&nbsp;from $lan_net to any keep state
+</tt>
+</blockquote>
+
+<p>
+Параметърът <tt>route-to</tt> се прилага към <i>входящия</i> трафик на 
+<i>вътрещния</i> интерфейс за да определят изходящите интерфейси, между които
+ще бъде балансиран този трафик. Забележете, че параметърът <tt>route-to</tt>
+трябва да присъства във <i>всяко</i> правило за филтриране, отнасящо се до
+този трафик. Пакетите, върнати в отговор, ще се рутират обратно към същия
+външен интерфейс, откъдето са излезли (това се прави от ISP) и ще постъпят
+нормално обратно във вътрешната мрежа.
+
+<p>
+За да е сигурно, че пакетите с начален адрес, принадлежащ на 
+<tt>$ext_if1</tt> винаги ще се рутират към <tt>$ext_gw1</tt> (и съответно
+за <tt>$ext_if2</tt> и <tt>$ext_gw2</tt>) следните два реда трябва да бъдат
+включени в набора правила (ruleset):
+<blockquote>
+<tt>
+pass out on $ext_if1 route-to ($ext_if2 $ext_gw2) from $ext_if2 \<br>
+&nbsp;&nbsp;&nbsp;to any<br>
+pass out on $ext_if2 route-to ($ext_if1 $ext_gw1) from $ext_if1 \<br>
+&nbsp;&nbsp;&nbsp;to any 
+</tt>
+</blockquote>
+
+<p>
+В заключение, NAT може да бъде използван също и на всеки изходящ интерфейс
+<blockquote>
+<tt>
+nat on $ext_if1 from $lan_net to any -&gt; ($ext_if1)<br>
+nat on $ext_if2 from $lan_net to any -&gt; ($ext_if2)
+</tt>
+</blockquote>
+
+<a name="outexample"></a>
+<p>
+Завършеният пример за баланс на натоварването на изходящия трафик е нещо
+подобно на:
+
+<p>
+<table border=0 width="650">
+<tr><td nowrap bgcolor="#EEEEEE">
+<pre>
+lan_net = "192.168.0.0/24"
+int_if  = "dc0"
+ext_if1 = "fxp0"
+ext_if2 = "fxp1"
+ext_gw1 = "68.146.224.1"
+ext_gw2 = "142.59.76.1"
+
+#  nat за изходящите адреси на всеки интернет интерфейс
+nat on $ext_if1 from $lan_net to any -&gt; ($ext_if1)
+nat on $ext_if2 from $lan_net to any -&gt; ($ext_if2)
+
+#  забранява по подразбиране
+block in  from any to any
+block out from any to any
+
+#  пропуска всички изходящи пакети на вътрешния интерфейс
+pass out on $int_if from any to $lan_net
+#  пропуска веднага (pass quick) пакетите с назначение самия gateway 
+pass in quick on $int_if from $lan_net to $int_if
+#  балансира изходящия tcp трафик от вътрешната мрежа
+pass in on $int_if route-to \
+    { ($ext_if1 $ext_gw1), ($ext_if2 $ext_gw2) } round-robin \
+    proto tcp from $lan_net to any flags S/SA modulate state
+#  балансира изходящия udp и icmp трафик от вътрешната мрежа
+pass in on $int_if route-to \
+    { ($ext_if1 $ext_gw1), ($ext_if2 $ext_gw2) } round-robin \
+    proto { udp, icmp } from $lan_net to any keep state
+
+#  общи "pass out" правила за външния интерфейс
+pass out on $ext_if1 proto tcp from any to any flags S/SA modulate state
+pass out on $ext_if1 proto { udp, icmp } from any to any keep state
+pass out on $ext_if2 proto tcp from any to any flags S/SA modulate state
+pass out on $ext_if2 proto { udp, icmp } from any to any keep state
+
+#  рутира пакетите от произволен IP адрес на $ext_if1 към $ext_gw1
+#  същото за $ext_if2 и $ext_gw2
+pass out on $ext_if1 route-to ($ext_if2 $ext_gw2) from $ext_if2 to any 
+pass out on $ext_if2 route-to ($ext_if1 $ext_gw1) from $ext_if1 to any 
+</pre>
+</td></tr>
+</table>
+
+<p>
+[<a href="shortcuts.html">Преди: Съкращения при създаването на Rulesets</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="perf.html">Следва: Производителност</a>]
+
+<p>
+<hr>
+<a href="index.html"><img height="24" width="24" src="../../../images/back.gif" border="0" alt="[back]"></a> 
+<a href="mailto:www@openbsd.org">www@openbsd.org</a>
+<br>
+<small>
+Оригинал: [ OpenBSD: pools.html,v 1.5 2003/06/13 02:54:08 nick Exp ]<br>
+$Id: pools.html,v 1.1 2003/09/16 07:30:42 moo Exp $<br>
+$Translation$<br>
+$OpenBSD$
+</small>
+
+</body>
+</html> 
