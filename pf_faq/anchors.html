@@ -1,0 +1,236 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>PF: Точки за закачане и именувани набори правила (Rulesets)</title>
+<link rev="made" href="mailto:www@openbsd.org">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+<meta name="resource-type" content="document">
+<meta name="description"   content="the OpenBSD FAQ page">
+<meta name="keywords"      content="openbsd,faq,pf">
+<meta name="distribution"  content="global">
+<meta name="copyright"     content="This document copyright 2003 by OpenBSD.">
+</head>
+
+<body bgcolor="#ffffff" text="#000000">
+<!-- Passes validator.w3.org, please keep it this way;
+please, use a max of 72 chars per line -->
+
+<img alt="[OpenBSD]" height=30 width=141 src="../../../images/smalltitle.gif">
+<p>
+[<a href="logging.html">Преди: Дневник на промените (Logging)</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="shortcuts.html">Следва: Съкращения при създаването на правилата</a>]
+
+<p>
+<h1><font color="#e00000">PF: Точки за закачане и именувани набори правила 
+(Rulesets)</font></h1>
+
+<hr>
+
+<h3>Съдържание</h3>
+<ul>
+<li><a href="#intro">Въведение</a>
+<li><a href="#named">Именувани набори с правила</a>
+<li><a href="#options">Параметри на anchor директивата</a>
+<li><a href="#manip">Работа с именувани набори правила</a>
+</ul>
+
+<hr>
+
+<a name="intro"></a>
+<h2>Въведение</h2>
+В добавка към главният набор правила, PF може също да обработва и допълнителни
+набори с правила (sub rulsets). Поради това, че допълнителните набори правила
+могат да се обработват без рестартиране на PF ("on the fly") с използването на 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+><tt>pfctl(8)</tt></a>, те предоставят удобен начин за динамично обновяване
+на активния набор с правила. Докато <a href="tables.html">таблиците</a>  
+се използват за съхранение на динамичен списък с адреси, допълнителните 
+набори с правила (sub rulesets) се използват за съхраняване на динамичен
+списък правила за филтриране, <tt>nat</tt>, <tt>rdr</tt> и 
+<tt>binat</tt> правила.
+
+<p>
+Допълнителните правила се добавят към главния набор с правила с използването
+на "точки за закачане" (anchors). Има 4 типа <tt>anchor</tt> правила:
+<ul>
+<li><tt>anchor <i>name</i></tt> - изпълнява всички <a href="filter.html">
+правила за филтриране</a> в точката за закачане <i><tt>name</tt></i>
+<li><tt>binat-anchor <i>name</i></tt> - изпълнява всички
+<a href="nat.html#binat"><tt>binat</tt></a> правила в точката за закачане
+<i><tt>name</tt></i>
+<li><tt>nat-anchor <i>name</i></tt> - изпълнява всички <a href="nat.html"> 
+<tt>nat</tt></a> правила в точката за закачане <i><tt>name</tt></i>
+<li><tt>rdr-anchor <i>name</i></tt> - изпълнява всички <a href="rdr.html">
+<tt>rdr</tt></a> правила в точката за закачане <i><tt>name</tt></i>
+</ul>
+
+Само главният набор с правила може да съдържа <tt>anchor</tt> правила.
+
+<a name="named"></a>
+<h2>Именувани набори с правила</h2>
+Именуваният набор с правила е група от правила за филтриране и/или
+трансформация, на която е присвоено име. Една <tt>точка за закачане</tt>
+може да съдържа няколко такива групи. Когато в главния набор с правила PF 
+стигне до правило с <tt>anchor</tt>, ще се изпълнят всички набори с правила,
+закачени към тази точка, по азбучен ред на имената им. След това обработката
+ще продължи в главния набор с правила, освен ако пакетът отговаря на правило
+за филтриране, съдържащо <tt>quick</tt> параметър или на правило за
+трансформация върте в самия допълнителен набор. В този случай обработката
+се смята за приключена и ще се прекъсне по-нататъчното обхождане на
+правилата и за допълнителния и за главния набор с правила.
+
+<p>
+Например:
+<blockquote>
+<tt>
+ext_if = "fxp0"<br>
+<br>
+block on $ext_if all<br>
+pass  out on $ext_if all keep state<br>
+anchor goodguys
+</tt>
+</blockquote>
+
+<p>
+Този набор от правила установява забрана по подразбиране на fxp0 и за
+входящия и за изходящия трафик. След това трафикът се пропуска навън,
+със запазване на състоянието и се създава точка за закачане с име
+<tt><i>goodguys</i></tt>. За да се добавят правила към точката за закачане
+<tt><i>goodguys</i></tt> се използват следните команди:
+<blockquote>
+<tt>
+# echo "pass in proto tcp from 192.0.2.3 to any port 22" \<br>
+&nbsp;&nbsp;&nbsp;| pfctl -a goodguys:ssh -f -
+</tt>
+</blockquote>
+
+<p>
+Това добавя <tt>pass</tt> правило в набор правила с име <tt><i>ssh</i></tt>,
+присъединен в точката за закачане <tt><i>goodguys</i></tt>. Когато PF достигне
+реда с <tt>anchor goodguys</tt> в главния набор с правила, ще се обработят и
+всички правила в този допълнителен набор (както и всички други набори с 
+правила закачени след това към тази точка).
+
+<p>
+Правилата могат също така да се запазват във/зареждат от текстов файл:
+<blockquote>
+<tt>
+# cat &gt;&gt; /etc/anchor-goodguys-www<br>
+pass in proto tcp from 192.0.2.3 to any port 80<br>
+pass in proto tcp from 192.0.2.4 to any port { 80 443 }<br>
+<br>
+# pfctl -a goodguys:www -f /etc/anchor-goodguys-www<br>
+</tt>
+</blockquote>
+
+<p>
+Това зарежда правилата от файла <tt>/etc/anchor-goodguys-www</tt> в
+допълнителния набор правила с име <tt><i>www</i></tt>, закачен в точката 
+<tt><i>goodguys</i></tt>.
+
+<p>
+Правилата за филтриране и трансформация могат да се въвеждат в именувания
+набор с правила с използването на същия синтаксис, както и в главния набор
+с правила. Малко предупреждение - всички използвани в набора с правила 
+<a href="macros.html">макроси</a>, трябва да бъдат дефинирани в самия него;
+макроси, дефинирани в главния набор с правила <i>не са достъпни</i> в
+допълнителните именувани набори с правила.
+
+<p>
+Както и главният набор с правила, всеки от допълнителните набори съществува
+отделно от останалите. Действията извършвани с даден набор правила, като
+например изтриването на правилата, не оказва влияние на останалите набори.
+В добавка, премахването на дадена точка за закачане от главния набор с
+правила не разрушава тази точка и допълнителните набори, закачени
+към нея. Именуваният набор с правила не се разрушава, докато не се премахнат
+всички правила в него, с използването на 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>pfctl(8)</a>. Едва когато точката за закачане няма именувани набори с правила,
+свързани с нея, и тя самата се разрушава.
+
+<a name="options"></a>
+<h2>Параметри на anchor директивата</h2>
+По избор <tt>anchor</tt> правилата когат да указват интерфейс, протокол,
+начален и краен адрес и т.н., с използването на същия синтаксис, както в
+правилата за филтриране. Когато е въведена такава информация, <tt>anchor</tt>
+правилата се изпълняват само за пакети отговарящи на зададеното правило.
+Например:
+<blockquote>
+<tt>
+ext_if = "fxp0"<br>
+<br>
+block on $ext_if all<br>
+pass  out on $ext_if all keep state<br>
+anchor ssh in on $ext_if proto tcp from any to any port 22<br>
+</tt>
+</blockquote>
+
+<p>
+Правилата в <tt>точката за закачане <i>ssh</i></tt> се обработват само за
+TCP пакети, предназначени за порт 22, които навлизат през fxp0. Правилата
+се довавят към тази точка по следния начин:
+<blockquote>
+<tt>
+# echo "pass in from 192.0.2.10 to any" | pfctl -a ssh:allowed -f -
+</tt>
+</blockquote>
+
+<p>
+Така, дори и правилото за филтриране в главния набор с правила да не указва 
+интерфейс, протокол или порт, само на системата с IP адрес 192.0.2.10 ще 
+бъде разрешено да се свързва, с използването на SSH, защото това е описано
+с допълнителния набор в <tt>anchor</tt> правилото.
+
+<a name="manip"></a>
+<h2>Работа с именувани набори с правила</h2>
+Именуваните набори с правила се управляват с <tt>pfctl</tt>. Това може да
+се използва за добавяне или премахване на правила от даден набор, без да се
+презарежда главния набор с правила.
+
+<p>
+За да се види списъка с правила в даден набор с име <tt><i>allowed</i></tt>,
+закачен в точка <tt><i>ssh</i></tt>:
+<blockquote>
+<tt>
+# pfctl -a ssh:allowed -s rules
+</tt>
+</blockquote>
+
+<p>
+За премахване на всички правила от посочения по-горе набор:
+<blockquote>
+<tt>
+# pfctl -a ssh:allowed -F rules
+</tt>
+</blockquote>
+
+<p>
+Ако името на набора с правила не е посочено, действието се прилага към
+всички набори в дадената точка на закачане.
+
+<p>
+За пълен списък на командите моля погледнете 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pfctl&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+><tt>pfctl(8)</tt></a>.
+
+<p>
+[<a href="logging.html">Преди: Дневник на промените (Logging)</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="shortcuts.html">Следва: Съкращения при създаването на правилата</a>]
+
+
+<p>
+<hr>
+<a href="index.html"><img height="24" width="24" src="../../../images/back.gif" border="0" alt="[back]"></a> 
+<a href="mailto:www@openbsd.org">www@openbsd.org</a>
+<br>
+<small>
+Оригинал: [ OpenBSD: anchors.html,v 1.5 2003/06/23 01:51:36 nick Exp ]<br>
+$Id: anchors.html,v 1.1 2003/09/29 08:08:59 moo Exp $<br>
+$Translation$<br>
+$OpenBSD$
+</small>
+
+</body>
+</html> 
