@@ -1,0 +1,328 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>PF: Дневник на промените (Logging)</title>
+<link rev="made" href="mailto:www@openbsd.org">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+<meta name="resource-type" content="document">
+<meta name="description"   content="the OpenBSD FAQ page">
+<meta name="keywords"      content="openbsd,faq,pf">
+<meta name="distribution"  content="global">
+<meta name="copyright"     content="This document copyright 2003 by OpenBSD.">
+</head>
+
+<body bgcolor="#ffffff" text="#000000">
+<!-- Passes validator.w3.org, please keep it this way;
+please, use a max of 72 chars per line -->
+
+<img alt="[OpenBSD]" height=30 width=141 src="../../../images/smalltitle.gif">
+<p>
+[<a href="filter.html">Преди: Филтриране на пакети</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="anchors.html">Следва: Точки за закачане и именувани набори с
+правила</a>]
+
+<p>
+<h1><font color="#e00000">PF: Дневник на промените(Logging)</font></h1>
+
+<hr>
+
+<h3>Съдържание</h3>
+<ul>
+<li><a href="#intro">Въведение</a>
+<li><a href="#logfile">Четене на дневника с промените</a>
+<li><a href="#filter">Филтриране на изхода от регистрирацията</a>
+<li><a href="#syslog">Регистриране на пакетите през Syslog</a>
+</ul>
+
+<hr>
+
+<a name="intro"></a>
+<h2>Въведение</h2>
+Регистрирането на пакети в PF се извършва от
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pflogd&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>pflogd(8)</a>, който очаква заявки на интерфейс  
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pflog&amp;sektion=4&amp;manpath=OpenBSD+3.3"
+>pflog0</a> и регистрира пакетите във файл (обикновено /var/log/pflog), като
+записа е в 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=tcpdump&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>tcpdump(8)</a> двойчен формат. Правилата за 
+<a href="filter.html">филтриране</a>, които съдържат ключовата дума
+<tt>log</tt> или <tt>log-all</tt> регистрират промените по този начин.
+
+<a name="logfile"></a>
+<h2>Четене на дневника с промените</h2>
+Файлът с промените, записан от 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pflogd&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>pflogd(8)</a> е в двойчен формат и не може да бъде четен с текстов редактор.
+За преглеждане на този файл може да се използва <a href="http://www.openbsd.org/cgi-bin/man.cgi?query=tcpdump&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>tcpdump(8)</a>.
+
+<p>
+За да видите какво е регистрирано в дневника с промените:
+<blockquote>
+<tt>
+# tcpdump -n -e -ttt -r /var/log/pflog
+</tt>
+</blockquote>
+
+<p>
+Забележете, че използването на 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=tcpdump&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>tcpdump(8)</a> за преглед на pflog файла <i>не позволява</i> разглеждане
+в реално време. Работата в реално време е възможна с достъп до 
+pflog0 интерфейса:
+<blockquote>
+<tt>
+# tcpdump -n -e -ttt -i pflog0
+</tt>
+</blockquote>
+
+<p>
+<font color="#e00000">ЗАБЕЛЕЖКА: </font>
+Когато се преглеждат промените, трябва специално да се внимава с детайлното
+показване на протокола (verbose protocol decoding) на tcpdump (което се
+активира с параметър <tt>-v</tt> от командния ред. Декодерите за протокола
+на tcpdump нямат перфектна история, свързана със сигурността им. Поне на
+теория е възможна атака със забавяне чрез специално изработени пакети,
+регистрирани от интерфейса за следене на промените. Препоръчителна практика
+е файловете да бъдат преместени извън firewall-а преди те подробно да се
+преглеждат.
+
+<p>
+Допълнително внимание трябва да се отдели и на сигурния достъп до дневниците
+с промените. По подразбиране
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pflogd&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>pflogd</a> ще регистрира 96 байта от пакета във файла с промените. Достъпът
+до този файл може да предостави частичен достъп до важна информация в пакетите
+(като например
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=telnet&amp;sektion=1&amp;manpath=OpenBSD+3.3"
+>telnet(1)</a> или
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=ftp&amp;sektion=1&amp;manpath=OpenBSD+3.3"
+>ftp(1)</a> потребителски usernames и пароли).
+
+<a name="filter"></a>
+<h2>Филтриране на изхода от регистрацията</h2>
+Поради това, че 
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=pflogd&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>pflogd(8)</a> записва в
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=tcpdump&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>tcpdump(8)</a> двойчен формат, може да се използва цялата гама от 
+възможностти на tcpdump за преглед на дневниците с промени. Например за да се
+видят само пакетите, отнасящи се до определен порт:
+<blockquote>
+<tt>
+# tcpdump -n -e -ttt -r /var/log/pflog port 80
+</tt>
+</blockquote>
+
+<p>
+Изходът може допълнително да се подобри, чрез указание да се покажат пакетите
+за определенa комбинация от адрес и порт:
+<blockquote>
+<tt>
+# tcpdump -n -e -ttt -r /var/log/pflog port 80 and host 192.168.1.3
+</tt>
+</blockquote>
+
+<p>
+Същата идея може да се приложи и при достъпа до pflog0 интерфейса:
+<blockquote>
+<tt>
+# tcpdump -n -e -ttt -i pflog0 host 192.168.4.2
+</tt>
+</blockquote>
+
+<p>
+Забележете, че това не се отразява на пакетите, регистрирани във дневника
+с промените, командите по-горе просто променят вида на изхода при разглеждане.
+
+<p>
+В добавка към използването на стандартните
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=tcpdump&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>tcpdump(8)</a> правила за филтриране, tcpdump езика за филтриране на OpenBSD
+е разширен за четене на изхода от pflogd:
+<ul>
+<li><tt>ip</tt> - IPv4 адреси.
+<li><tt>ip6</tt> - IPv6 адреси.
+<li><tt>on <i>int</i></tt> - пакет, преминаващ през интерфейс 
+<i>int</i>.
+<li><tt>ifname <i>int</i></tt> - същото като <tt>on <i>int</i></tt>.
+<li><tt>rulenum <i>num</i></tt> - правилото за филтриране, на което пакетът
+отговаря е правило номер <i>num</i>.
+<li><tt>action <i>act</i></tt> - действие, предприето при обработката на този
+пакет. 
+Възможните действия са <tt>pass</tt> and <tt>block</tt>.
+<li><tt>reason <i>res</i></tt> - причина за предприетото действие <tt>action</tt>. Възможните причини са <tt>match</tt>, <tt>bad-offset</tt>,
+<tt>fragment</tt>, <tt>short</tt>, <tt>normalize</tt> и
+<tt>memory</tt>.
+<li><tt>inbound</tt> - входящ пакет.
+<li><tt>outbound</tt> - изходящ пакет.
+
+</ul>
+
+<p>
+Пример:
+<blockquote>
+<tt>
+# tcpdump -n -e -ttt -i pflog0 inbound and action block and on wi0
+</tt>
+</blockquote>
+
+<p>
+Това показва в реално време регистрираните входящи пакети, които са
+блокирани на wi0 интерфейса.
+
+<a name="syslog"></a>
+<h2>Регистриране на пакетите през Syslog</h2>
+Често се налага да имаме дневника с промените във firewall-а в ASCII формат
+и/или да го изпратим на отдалечен регистриращ промените сървър (remote
+logging server). Това може изцяло да бъде реализирано с два малки shell
+скрипта, няколко малки промени в конфигурационните файлове и
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=syslogd&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>syslogd(8)</a> - logging daemon. Syslogd(8) регистрира промените в ASCII
+формат и има възможност да записва на отдалечен регистриращ сървър.
+
+<p>
+Първо трябва да създадем потребител, <tt>pflogger</tt> с shell
+<tt>/sbin/nologin</tt>. Най-лесният начин за създаване на потребител е с
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=adduser&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>adduser(8)</a>.
+
+<p>
+След създаването на потребителя <tt>pflogger</tt> се създават и следните два
+скрипта:
+
+<p>
+<tt>/etc/pflogrotate</tt>
+<pre>
+	FILE=/home/pflogger/pflog5min.$(date "+%Y%m%d%H%M")
+	kill -ALRM $(cat /var/run/pflogd.pid)
+	if [ $(ls -l /var/log/pflog | cut -d " " -f 8) -gt 24 ]; then
+	   mv /var/log/pflog $FILE
+	   chown pflogger $FILE
+	   kill -HUP $(cat /var/run/pflogd.pid)
+	fi
+</pre>
+
+<p>
+<tt>/home/pflogger/pfl2sysl</tt>
+<pre>
+	for logfile in /home/pflogger/pflog5min* ; do
+	   tcpdump -n -e -ttt -r $logfile | logger -t pf -p local0.info
+	   rm $logfile
+	done
+</pre>
+
+<p>
+Редактирайте cron job за root потребителя:
+<blockquote>
+<tt>
+# crontab -u root -e
+</tt>
+</blockquote>
+
+<p>
+Добавете следните два реда:
+<blockquote>
+<tt>
+# архивира pf log файла всеки 5 минути<br>
+0-59/5 *       *       *       *       /bin/sh /etc/pflogrotate
+</tt>
+</blockquote>
+
+<p>
+Създайте cron job за потребителя <tt>pflogger</tt>:
+<blockquote>
+<tt>
+# crontab -u pflogger -e
+</tt>
+</blockquote>
+
+<p>
+Добавете следните два реда:
+<blockquote>
+<tt>
+# подава завъртените pflog файл(ове) към syslog<br>
+0-59/5 *       *       *       *       /bin/sh /home/pflogger/pfl2sysl
+</tt>
+</blockquote>
+
+<p>
+Добавете следния ред в <tt>/etc/syslog.conf</tt>:
+<blockquote>
+<tt>
+local0.info    /var/log/pflog.txt
+</tt>
+</blockquote>
+
+<p>
+Ако освен това искате да регистрирате промените на отдалечен сървър,
+добавете и реда:
+<blockquote>
+<tt>
+local0.info    @syslogger
+</tt>
+</blockquote>
+
+<p>
+Проверете дали адресът на системата <i>syslogger</i> е дефиниран във файла
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=hosts&amp;sektion=5&amp;manpath=OpenBSD+3.3"
+>/etc/hosts(5)</a>.
+
+<p>
+Рестартирайте syslogd(8) за да го уведомите за промените:
+<blockquote>
+<tt>
+# kill -HUP $(cat /var/run/syslog.pid)
+</tt>
+</blockquote>
+
+<p>
+Всички регистрирани пакети сега ще се изпращат към <tt>/var/log/pflog.txt</tt>.
+Ако е добавен и вторият ред, те ще се изпращат и към отдалечен регистриращ
+сървър с адрес <i>syslogger</i>.
+
+
+<p>
+Скриптът <tt>/etc/pflogrotate</tt> първо обработва, а след това и изтрива
+<tt>/var/log/pflog</tt>, така че архивирането на <tt>pflog</tt> от
+<a href="http://www.openbsd.org/cgi-bin/man.cgi?query=newsyslog&amp;sektion=8&amp;manpath=OpenBSD+3.3"
+>newsyslog(8)</a> повече не е необходимо и може да бъде забранено. За сметка на
+това обаче <tt>/var/log/pflog.txt</tt> заменя
+<tt>/var/log/pflog</tt> и трябва да се разреши архивирането му.
+Променете <tt>/etc/newsyslog.conf</tt> както следва:
+<blockquote>
+<tt>
+#/var/log/pflog       600    3    250    *    ZB /var/run/pflogd.pid<br>
+/var/log/pflog.txt    600    7    *      24
+</tt>
+</blockquote>
+
+<p>
+PF вече ще регистрира в ASCII формат във файла <tt>/var/log/pflog.txt</tt>.
+В допълнение, ако е зададено в <tt>/etc/syslog.conf</tt> той също ще и
+регистрира на отдалечен сървър. Регистрирането не става веднага и може да
+изминат около 5-6 минути (интервала, зададен в cron job) преди регистрираните
+пакети да се появят във файла за запис. 
+
+<p>
+[<a href="filter.html">Преди: Филтриране на пакети</a>]
+[<a href="index.html">Съдържание</a>]
+[<a href="anchors.html">Следва: Точки за закачане и именувани набори с
+правила</a>]
+
+<p>
+<hr>
+<a href="index.html"><img height="24" width="24" src="../../../images/back.gif" border="0" alt="[back]"></a> 
+<a href="mailto:www@openbsd.org">www@openbsd.org</a>
+<br>
+<small>
+Оригинал: [ OpenBSD: logging.html,v 1.6 2003/07/03 14:01:08 nick Exp ]<br>
+$Id: logging.html,v 1.1 2003/10/17 07:48:25 moo Exp $<br>
+$Translation$<br>
+$OpenBSD$
+</small>
+
+</body>
+</html> 
